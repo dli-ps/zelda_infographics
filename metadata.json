@@ -1,0 +1,5 @@
+{
+  "name": "Zelda Sales Infographic Generator",
+  "description": "Generates a motion graphics infographic of The Legend of Zelda North American sales data using Remotion and Gemini API.",
+  "requestFramePermissions": []
+}
