@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Player } from '@remotion/player';
+import React, { useState, useEffect, useRef } from 'react';
+import { Player, PlayerRef } from '@remotion/player';
 import { fetchZeldaData } from './services/geminiService';
 import { ZeldaGame, AppState } from './types';
 import { MyComposition } from './components/RemotionVideo/Composition';
@@ -7,7 +7,7 @@ import { MyComposition } from './components/RemotionVideo/Composition';
 const FPS = 30;
 
 // Timing constants must match Composition.tsx
-const INTRO_DURATION = 80;
+const INTRO_DURATION = 100;
 const SLIDE_DURATION = 100;
 const SUMMARY_DURATION = 150; // 5 seconds
 
@@ -15,6 +15,8 @@ const App: React.FC = () => {
   const [data, setData] = useState<ZeldaGame[]>([]);
   const [state, setState] = useState<AppState>(AppState.IDLE);
   const [error, setError] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const playerRef = useRef<PlayerRef>(null);
 
   const loadData = async () => {
     setState(AppState.LOADING);
@@ -48,14 +50,74 @@ const App: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const downloadVideo = () => {
-    alert("To download this video as an MP4, you would typically use the `npx remotion render` command in your terminal. This web preview is for visualization only.");
-  };
-
   // Calculate dynamic video duration
   const videoDuration = state === AppState.READY 
     ? INTRO_DURATION + (data.length * SLIDE_DURATION) + SUMMARY_DURATION
     : 300; // Default placeholder duration
+
+  const downloadVideo = async () => {
+    try {
+      // 1. Request screen/tab capture
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          displaySurface: "browser",
+        },
+        audio: true,
+        preferCurrentTab: true,
+      } as any);
+
+      setIsRecording(true);
+
+      const mimeType = MediaRecorder.isTypeSupported("video/webm; codecs=vp9") 
+        ? "video/webm; codecs=vp9" 
+        : "video/webm";
+
+      const recorder = new MediaRecorder(stream, { mimeType });
+      const chunks: BlobPart[] = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'zelda_sales_infographic.webm';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        setIsRecording(false);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      // 2. Start recording and playback
+      recorder.start();
+      
+      if (playerRef.current) {
+        playerRef.current.seekTo(0);
+        playerRef.current.play();
+      }
+
+      // 3. Stop automatically at end of video
+      const durationMs = (videoDuration / FPS) * 1000;
+      setTimeout(() => {
+        if (recorder.state !== 'inactive') {
+          recorder.stop();
+        }
+        if (playerRef.current) {
+          playerRef.current.pause();
+        }
+      }, durationMs + 500); // Add small buffer
+
+    } catch (err) {
+      console.error("Recording failed or cancelled:", err);
+      setIsRecording(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 selection:bg-emerald-500 selection:text-white">
@@ -105,6 +167,7 @@ const App: React.FC = () => {
 
               {state === AppState.READY && (
                 <Player
+                  ref={playerRef}
                   component={MyComposition}
                   inputProps={{ data }}
                   durationInFrames={videoDuration}
@@ -116,8 +179,8 @@ const App: React.FC = () => {
                     height: '100%',
                   }}
                   controls
-                  autoPlay
-                  loop
+                  loop={!isRecording}
+                  autoPlay={!isRecording}
                 />
               )}
             </div>
@@ -144,17 +207,32 @@ const App: React.FC = () => {
                   <div className="flex flex-wrap gap-2">
                     <button 
                       onClick={downloadData}
-                      className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded text-sm font-medium transition-colors border border-slate-600"
+                      disabled={isRecording}
+                      className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded text-sm font-medium transition-colors border border-slate-600 disabled:opacity-50"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                       Download JSON
                     </button>
                     <button 
                       onClick={downloadVideo}
-                      className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-sm font-medium transition-colors border border-emerald-600"
+                      disabled={isRecording}
+                      className={`flex items-center gap-2 px-4 py-2 text-white rounded text-sm font-medium transition-colors border ${
+                        isRecording 
+                          ? 'bg-red-600 border-red-500 animate-pulse' 
+                          : 'bg-emerald-700 hover:bg-emerald-600 border-emerald-600'
+                      }`}
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                      Download Video
+                      {isRecording ? (
+                        <>
+                          <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+                          Recording...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                          Record & Download
+                        </>
+                      )}
                     </button>
                   </div>
                 )}
