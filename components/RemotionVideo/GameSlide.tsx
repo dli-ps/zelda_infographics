@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { interpolate, spring, useCurrentFrame, useVideoConfig, Img, staticFile } from 'remotion';
 import { ZeldaGame } from '../../types';
 
