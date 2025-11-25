@@ -25,7 +25,8 @@ interface BarChartProps {
 export const BarChart: React.FC<BarChartProps> = ({ data }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
-
+  // sort by year
+  data.sort((a, b) => a.year - b.year);
   // Dimensions
   const chartHeight = height * 0.45; // Slightly shorter to make room for images
   const itemWidth = (width * 0.9) / data.length;
