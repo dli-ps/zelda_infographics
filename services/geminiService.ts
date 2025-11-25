@@ -160,6 +160,6 @@ export const fetchZeldaData = async (): Promise<ZeldaGame[]> => {
    "boxArtUrl": "Echoes_of_Wisdom_Box_Art.png" 
   }
  ];
-
+ data.sort((a, b) => a.naSales - b.naSales);
  return Promise.resolve(data);
 };

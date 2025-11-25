@@ -1,0 +1,71 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: ["master", "main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: 'npm'
+
+      - name: Install dependencies
+        # This step handles installing all necessary node modules
+        run: npm ci
+
+      - name: Build Web Application
+        run: npm run build
+        env:
+          VITE_GEMINI_API_KEY: truly_dumb
+
+      # --- New Step: Run the render script ---
+      - name: Render Videos
+        run: npm run render
+
+      # --- New Step: Upload any generated MP4 files as a separate artifact ---
+      - name: Upload Video Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # Name the artifact so it's easy to find in the run summary
+          name: rendered-mp4-videos
+          # Define the path to find all .mp4 files in the workspace (excluding node_modules)
+          path: |
+            **/*.mp4
+            !node_modules
+          # Optionally set how long to keep the artifact
+          retention-days: 7
+
+      - name: Upload Pages Artifact
+        # This artifact is specifically for the GitHub Pages deployment (the built website)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
