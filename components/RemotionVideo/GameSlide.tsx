@@ -191,7 +191,7 @@ export const GameSlide: React.FC<GameSlideProps> = ({ game, maxSales, index }) =
                 <div className="w-[400px] bg-slate-800 rounded-lg shadow-2xl shadow-black relative overflow-hidden border border-slate-700 flex items-center justify-center group">
                     {game.boxArtUrl ? (
                         <Img 
-                            src={staticFile(getAssetUrl(game.boxArtUrl))}
+                            src={game.boxArtUrl}
                             className="w-full h-auto" 
                             onError={(e: any) => {
                                 e.target.style.display = 'none';
